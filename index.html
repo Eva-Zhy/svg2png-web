@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>在线将svg字符串转为png</title>
+  </head>
+  <body>
+    <div>
+      <p>
+        <label for="svg">svg内容</label>
+        <textarea id="svg" name="svg" cols="30" rows="10" style="width: 500px; height: 300px;"></textarea>
+      </p>
+      <p>
+        <label for="width">生成图片的宽度</label>
+        <input type="number" value="500" name="width" id="width"/>
+
+        <label for="height">生成图片的高度</label>
+        <input type="number" value="500" name="height" id="height"/>
+      </p>
+      <p><button>生成</button></p>
+    </div>
+    <div>
+      <p>生成效果：</p>
+      <img src="" id="output" style="border: 2px dashed #999999;" />
+    </div>
+  </body>
+  <script>
+    var Base64 = {};  // Base64 namespace
+    Base64.code = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+    Base64.encode = function(str) {  // http://tools.ietf.org/html/rfc4648
+      var o1, o2, o3, bits, h1, h2, h3, h4, e=[], pad = '', c, plain, coded;
+      var b64 = Base64.code;
+      plain = str;
+
+      c = plain.length % 3;  // pad string to length of multiple of 3
+      if (c > 0) { while (c++ < 3) { pad += '='; plain += '\0'; } }
+      // note: doing padding here saves us doing special-case packing for trailing 1 or 2 chars
+
+      for (c=0; c<plain.length; c+=3) {  // pack three octets into four hexets
+        o1 = plain.charCodeAt(c);
+        o2 = plain.charCodeAt(c+1);
+        o3 = plain.charCodeAt(c+2);
+
+        bits = o1<<16 | o2<<8 | o3;
+
+        h1 = bits>>18 & 0x3f;
+        h2 = bits>>12 & 0x3f;
+        h3 = bits>>6 & 0x3f;
+        h4 = bits & 0x3f;
+
+        // use hextets to index into code string
+        e[c/3] = b64.charAt(h1) + b64.charAt(h2) + b64.charAt(h3) + b64.charAt(h4);
+      }
+      coded = e.join('');  // join() is far faster than repeated string concatenation in IE
+
+      // replace 'A's from padded nulls with '='s
+      coded = coded.slice(0, coded.length-pad.length) + pad;
+
+      return coded;
+    }
+    var btoa = window.btoa || Base64.encode;
+
+
+    function cb_utob(c) {
+      if (c.length < 2) {
+        var cc = c.charCodeAt(0)
+        return cc < 0x80 ? c
+          : cc < 0x800 ? (String.fromCharCode(0xc0 | (cc >>> 6))
+          + String.fromCharCode(0x80 | (cc & 0x3f)))
+          : (String.fromCharCode(0xe0 | ((cc >>> 12) & 0x0f))
+          + String.fromCharCode(0x80 | ((cc >>>  6) & 0x3f))
+          + String.fromCharCode(0x80 | ( cc         & 0x3f)))
+      } else {
+        var cc = 0x10000
+          + (c.charCodeAt(0) - 0xD800) * 0x400
+          + (c.charCodeAt(1) - 0xDC00)
+        return (String.fromCharCode(0xf0 | ((cc >>> 18) & 0x07))
+          + String.fromCharCode(0x80 | ((cc >>> 12) & 0x3f))
+          + String.fromCharCode(0x80 | ((cc >>>  6) & 0x3f))
+          + String.fromCharCode(0x80 | ( cc         & 0x3f)))
+      }
+    }
+    function utob (u) {
+      var re_utob = /[\uD800-\uDBFF][\uDC00-\uDFFFF]|[^\x00-\x7F]/g
+      return u.replace(re_utob, cb_utob)
+    }
+    function svg2base64(svgStr) {
+      return 'data:image/svg+xml;base64,' + btoa(utob(svgStr))
+    }
+
+    function svg2png() {
+      var canvas = document.createElement('canvas');
+      var svgStr = document.querySelector('#svg').value.trim();
+      var width = parseFloat(document.querySelector('#width').value.trim(), 10) || 300;
+      var height = parseFloat(document.querySelector('#height').value.trim(), 10) || 300;
+      canvas.width = width;
+      canvas.height = height;
+      var ctx = canvas.getContext('2d');
+      var img = new Image();
+      //img.setAttribute('crossOrigin', 'anonymous');
+      img.onload = function() {
+        ctx.drawImage(this, 0, 0, width, height);
+        document.querySelector('#output').src = canvas.toDataURL();
+      }
+      img.src = svg2base64(svgStr);
+      if (img.complete) { img.onload(); }
+    }
+    document.querySelector('button').addEventListener('click', svg2png, false);
+  </script>
+</html>
